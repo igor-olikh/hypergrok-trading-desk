@@ -1,0 +1,12 @@
+title = "hypergrok public placeholders"
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "documented fake account ids"
+regexTarget = "match"
+regexes = [
+  '''DU0000000''',
+  '''U0000000''',
+]

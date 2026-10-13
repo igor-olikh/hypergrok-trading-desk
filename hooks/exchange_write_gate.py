@@ -35,6 +35,10 @@ SDK_WRITE_RE = re.compile(
 )
 # A raw POST: the API host's /exchange path, or a base URL joined to it.
 ENDPOINT_RE = re.compile(r"\.xyz/exchange\b|\}/exchange\b|\+\s*[\"']/exchange[\"']")
+IBKR_WRITE_RE = re.compile(
+    r"\bplace_order\s*\(|\bcancel_order\s*\(|/iserver/account/[^\s\"']+/orders\b|/iserver/reply/",
+    re.IGNORECASE,
+)
 SCRIPT_RE = re.compile(r"[\w./~-]+\.(?:py|ts|mts|cts|js|mjs|cjs)\b")
 MAX_SCRIPT_BYTES = 2_000_000
 
@@ -46,6 +50,9 @@ def find_write(text):
     match = ENDPOINT_RE.search(text)
     if match:
         return "a POST to /exchange"
+    match = IBKR_WRITE_RE.search(text)
+    if match:
+        return match.group(0).strip()
     return None
 
 
@@ -84,7 +91,7 @@ def decide(event):
             "hookEventName": "PreToolUse",
             "permissionDecision": "ask",
             "permissionDecisionReason": (
-                f"HyperGrok: this looks like a Hyperliquid exchange write ({found} {where}). "
+                f"HyperGrok: this looks like an exchange write ({found} {where}). "
                 "Approve only if it is the single send for a ticket with a Risk PASS "
                 "and your approval by that ticket id."
             ),

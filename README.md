@@ -28,7 +28,16 @@ The first thing the Desk Lead shows is useful, live output—not a configuration
 python3 scripts/opening_bell.py --coin ETH
 ```
 
-It reports source and UTC time, mid/mark/oracle, 24-hour change and volume, hourly funding, open interest, spread and depth at 5/10/25 bps. Twenty book levels stop a few bps from the mid on a liquid perp, so it re-reads the book at a coarser `nSigFigs` page until each band is measured, names the page every figure came from, and still marks a band no page reaches as a floor rather than a total. `scripts/desk_doctor.py` then checks the release, team files, the reviewed skill bytes, desk folders and public connectivity. Both are read-only and standard-library Python.
+It reports source and UTC time, mid/mark/oracle, 24-hour change and volume, hourly funding, open interest, spread and depth at 5/10/25 bps.
+
+US stocks use the same desk with `DESK_VENUE=ibkr`. The snapshot is last, bid and ask, session (pre, regular, post, or closed) and halt. Missing fields stay unavailable. They are never shown as zero. No order is sent unless you approve that ticket id.
+
+```bash
+python3 scripts/opening_bell.py --symbol SPY --json
+python3 scripts/desk_doctor.py --venue ibkr --offline --json
+```
+
+Copy `.env.example` to `.env` (never commit `.env`). The default account is paper. Live needs `IBKR_LIVE=1`, `--live`, and the words `confirm live`. The broker gateway is `IBKR_GATEWAY_URL`. The account id stays in the environment, not in the repo. Twenty book levels stop a few bps from the mid on a liquid perp, so it re-reads the book at a coarser `nSigFigs` page until each band is measured, names the page every figure came from, and still marks a band no page reaches as a floor rather than a total. `scripts/desk_doctor.py` then checks the release, team files, the reviewed skill bytes, desk folders and public connectivity. Both are read-only and standard-library Python.
 
 For automated reads, inspect `--schema` without touching the network, then use `--json`. Success and errors have a versioned contract; a failed read remains unavailable, and incomplete depth and doctor warnings retain their meaning. Snapshots accept canonical mixed-case coins and explicit HIP-3 markets:
 

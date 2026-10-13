@@ -214,6 +214,18 @@ def check_public_api(base_url: str, timeout: float) -> Check:
         return Check("FAIL", "public API", f"unavailable: {exc}")
 
 
+def ibkr_gateway_checks(timeout: float) -> list[Check]:
+    from ibkr_client import IbkrError, client_from_env, gateway_report
+
+    try:
+        client = client_from_env(timeout)
+        auth = client.auth_status()
+        summary = client.get_account_summary()
+    except (IbkrError, OSError, ValueError, TypeError) as exc:
+        return [Check("FAIL", "ibkr gateway", "unavailable")]
+    return [Check(row["status"], row["name"], row["detail"]) for row in gateway_report(auth, summary)]
+
+
 def render(checks: list[Check]) -> str:
     width = max(len(check.name) for check in checks)
     lines = ["HYPERGROK DESK DOCTOR", "READ ONLY · no key access · no writes", ""]
@@ -231,6 +243,7 @@ def main(argv=None) -> int:
     parser.add_argument("--desk-root", help="also validate a prepared trading-desk directory")
     add_network_arguments(parser)
     parser.add_argument("--offline", action="store_true", help="skip the public connectivity check")
+    parser.add_argument("--venue", choices=("ibkr", "hyperliquid"), default=None)
     parser.add_argument("--json", action="store_true")
     args = parser.parse_args(argv)
     if args.schema:
@@ -245,7 +258,14 @@ def main(argv=None) -> int:
         checks = check_repository(os.path.abspath(args.repo_root))
         if args.desk_root:
             checks.extend(check_workspace(os.path.abspath(args.desk_root)))
-        checks.append(Check("SKIP", "public API", "offline mode") if args.offline else check_public_api(base_url, args.timeout))
+        venue = args.venue or os.environ.get("DESK_VENUE", "ibkr")
+        if args.offline:
+            name = "ibkr gateway" if venue == "ibkr" else "public API"
+            checks.append(Check("SKIP", name, "offline mode"))
+        elif venue == "ibkr":
+            checks.extend(ibkr_gateway_checks(args.timeout))
+        else:
+            checks.append(check_public_api(base_url, args.timeout))
     except (OSError, ValueError, KeyError, TypeError) as exc:
         if args.json:
             emit_error("source_unavailable", str(exc))

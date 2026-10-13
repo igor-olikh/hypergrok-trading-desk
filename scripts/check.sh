@@ -128,3 +128,10 @@ python3 scripts/test_exchange_write_gate.py
 
 # Verify the published arithmetic without loading a wallet or SDK.
 python3 scripts/test_order_rounding.py
+python3 scripts/test_ibkr.py
+
+if ! command -v gitleaks >/dev/null 2>&1; then
+  echo "gitleaks is not installed"
+  exit 1
+fi
+gitleaks detect --source . --no-banner --redact --config .gitleaks.toml

@@ -21,7 +21,7 @@
     {"name": "desk-monitoring", "path": "skills/desk-monitoring/SKILL.md", "sha256": "7ed83e608c38f9a31c3b2521a9445ee5af5143f972e73f0d0f1dc54b3ffbc75b"},
     {"name": "desk-operating-model", "path": "skills/desk-operating-model/SKILL.md", "sha256": "945c599f50bef01d075c0b4ea46d7422339c5110e1e6c28e6014155dc5690ff0"},
     {"name": "desk-post-trade-review", "path": "skills/desk-post-trade-review/SKILL.md", "sha256": "5e8bf93374811743b4881f4717d7159089d8c01a24fd1ab2cc9344ea39c09763"},
-    {"name": "desk-risk-limits", "path": "skills/desk-risk-limits/SKILL.md", "sha256": "8401cf750659a6548693df348305ce86daade5587960b30ca5044f70a4c24295"},
+    {"name": "desk-risk-limits", "path": "skills/desk-risk-limits/SKILL.md", "sha256": "680e26ac676dc347be4473bf113fa44f0cf4f084983f7907e855068591c57ec3"},
     {"name": "desk-strategy-lab", "path": "skills/desk-strategy-lab/SKILL.md", "sha256": "b47aca3a83cdc5fe34025ee4f56242b73bd31763532828a88d48228abb5538ba"},
     {"name": "desk-trade-lifecycle", "path": "skills/desk-trade-lifecycle/SKILL.md", "sha256": "2b4ab73008e2fd02e600f5e45a517a79ee80a7ef659dff78ea059cf5e1779c7b"},
     {"name": "hypergrok-bootstrap", "path": "skills/hypergrok-bootstrap/SKILL.md", "sha256": "09c03788615251ecd57b65536b8f256f242da7e3cfc3dbff50d06bd724a8531d"},
