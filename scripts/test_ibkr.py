@@ -8,6 +8,7 @@ import os
 import ssl
 import tempfile
 import unittest
+from unittest.mock import patch
 from contextlib import redirect_stderr, redirect_stdout
 from datetime import datetime
 from decimal import Decimal
@@ -24,21 +25,42 @@ def load(name):
     return module
 
 
+os.environ["DESK_VENUE"] = "ibkr"
+
 ibkr_market = load("ibkr_market")
 ibkr_client = load("ibkr_client")
 ibkr_risk = load("ibkr_risk")
 ibkr_execute = load("ibkr_execute")
-opening_bell = load("opening_bell")
-research_dataset = load("research_dataset")
+ibkr_opening_bell = load("ibkr_opening_bell")
+ibkr_research = load("ibkr_research")
+ibkr_doctor = load("ibkr_doctor")
+
+
 def load_hook():
     spec = importlib.util.spec_from_file_location(
-        "exchange_write_gate", os.path.join(ROOT, "hooks", "exchange_write_gate.py"))
+        "ibkr_write_gate", os.path.join(ROOT, "hooks", "ibkr_write_gate.py"))
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return module
 
 
 gate = load_hook()
+
+ORIGINALS = (
+    "scripts/opening_bell.py",
+    "scripts/desk_doctor.py",
+    "scripts/research_dataset.py",
+    "scripts/check.sh",
+    "scripts/test_opening_bell.py",
+    "scripts/test_exchange_write_gate.py",
+    "hooks/exchange_write_gate.py",
+    "skills/desk-risk-limits/SKILL.md",
+    "agents/execution-trader.md",
+    "agents/risk-manager.md",
+    "README.md",
+    ".github/workflows/ci.yml",
+    "template/grok-bot.json",
+)
 
 QUOTE = {
     "symbol": "SPY",
@@ -100,7 +122,7 @@ class SnapshotTest(unittest.TestCase):
             with open(path, "w", encoding="utf-8") as handle:
                 json.dump(QUOTE, handle)
             with redirect_stdout(io.StringIO()) as output:
-                code = opening_bell.main(["--symbol", "SPY", "--fixture-quote", path, "--json"])
+                code = ibkr_opening_bell.main(["--symbol", "SPY", "--fixture-quote", path, "--json"])
         self.assertEqual(code, 0)
         payload = json.loads(output.getvalue())
         self.assertEqual(payload["schema_version"], 2)
@@ -327,7 +349,7 @@ class DatasetTest(unittest.TestCase):
             with open(fixture, "w", encoding="utf-8") as handle:
                 json.dump([{"t": 1, "open": 1, "high": 2, "low": 1, "close": 2, "volume": 3, "adjusted": True}], handle)
             with redirect_stdout(io.StringIO()) as stdout:
-                code = research_dataset.main([
+                code = ibkr_research.main([
                     "--symbol", "SPY", "--output", output, "--fixture-bars", fixture, "--json",
                 ])
             self.assertEqual(code, 0)
@@ -335,7 +357,7 @@ class DatasetTest(unittest.TestCase):
             self.assertTrue(manifest["adjusted"])
             self.assertNotIn("funding", manifest)
             with redirect_stderr(io.StringIO()), self.assertRaises(SystemExit):
-                research_dataset.main(["--symbol", "SPY", "--with-funding", "--output", output + "2"])
+                ibkr_research.main(["--symbol", "SPY", "--with-funding", "--output", output + "2"])
 
 
 class GateTest(unittest.TestCase):
@@ -350,10 +372,66 @@ class GateTest(unittest.TestCase):
         self.assertIsNotNone(post)
         read = gate.decide({
             "tool_name": "Bash",
-            "tool_input": {"command": "python3 scripts/opening_bell.py --symbol SPY --json"},
+            "tool_input": {"command": "python3 scripts/ibkr_opening_bell.py --symbol SPY --json"},
             "cwd": ROOT,
         })
         self.assertIsNone(read)
+        send = gate.decide({
+            "tool_name": "Bash",
+            "tool_input": {"command": "python3 scripts/ibkr_execute.py --help"},
+            "cwd": ROOT,
+        })
+        self.assertEqual(send["hookSpecificOutput"]["permissionDecision"], "ask")
+
+    def test_gate_is_silent_when_the_venue_is_not_ibkr(self):
+        off = {"DESK_VENUE": "hyperliquid"}
+        ask = gate.decide(
+            {"tool_name": "Bash", "tool_input": {"command": "client.place_order(order)"}, "cwd": ROOT},
+            env=off,
+        )
+        self.assertIsNone(ask)
+
+
+class SwitchTest(unittest.TestCase):
+    def test_original_files_do_not_carry_the_ibkr_switch(self):
+        for relative in ORIGINALS:
+            with self.subTest(relative=relative):
+                with open(os.path.join(ROOT, relative), encoding="utf-8") as handle:
+                    text = handle.read().lower()
+                self.assertNotIn("desk_venue", text)
+                self.assertNotIn("ibkr", text)
+
+    def test_tools_stay_off_until_the_setting_is_ibkr(self):
+        with patch.dict(os.environ, {"DESK_VENUE": "hyperliquid"}):
+            with tempfile.TemporaryDirectory() as directory:
+                path = os.path.join(directory, "ticket.json")
+                with open(path, "w", encoding="utf-8") as handle:
+                    json.dump(ticket(), handle)
+                with redirect_stderr(io.StringIO()) as errors:
+                    code = ibkr_execute.main(["--ticket-file", path, "--approve", "approve IB-20261013-01"])
+                self.assertEqual(code, 2)
+                self.assertIn("DESK_VENUE", errors.getvalue())
+                client = ibkr_client.MockIbkrClient()
+                with self.assertRaises(ibkr_execute.SendRefused):
+                    ibkr_execute.send_once(client, ticket(), "approve IB-20261013-01", directory=directory)
+                self.assertEqual(client.sent, [])
+            with redirect_stderr(io.StringIO()) as errors:
+                bell = ibkr_opening_bell.main(["--symbol", "SPY"])
+            self.assertEqual(bell, 2)
+            self.assertIn("DESK_VENUE", errors.getvalue())
+            with redirect_stderr(io.StringIO()) as errors:
+                doctor = ibkr_doctor.main(["--offline", "--json"])
+            self.assertEqual(doctor, 2)
+            self.assertIn("DESK_VENUE", errors.getvalue())
+
+    def test_offline_doctor_skips_the_gateway_without_a_network_call(self):
+        with redirect_stdout(io.StringIO()) as output:
+            code = ibkr_doctor.main(["--offline", "--json"])
+        payload = json.loads(output.getvalue())
+        gateway = [row for row in payload["checks"] if row["name"] == "ibkr gateway"]
+        self.assertEqual(gateway, [{"status": "SKIP", "name": "ibkr gateway", "detail": "offline mode"}])
+        self.assertEqual(code, 0)
+        self.assertNotIn("DU0000000", output.getvalue())
 
 
 if __name__ == "__main__":

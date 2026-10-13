@@ -14,6 +14,7 @@ import sys
 from decimal import Decimal
 
 from ibkr_risk import review_new_risk, round_limit
+from ibkr_venue import OFF, enabled
 
 TICKET_RE = re.compile(r"^IB-\d{8}-\d{2}$")
 STATE_NAME = "sent-tickets.json"
@@ -92,6 +93,8 @@ def live_allowed(mode: str, account_kind: str, live_flag: bool, env: dict, confi
 def send_once(client, ticket: dict, approval: str, *, directory: str, risk_state: dict | None = None,
               live_flag: bool = False, env: dict | None = None, confirmation: str = "") -> dict:
     """Place the bracket once. Any refusal happens before place_order."""
+    if not enabled():
+        raise SendRefused(OFF)
     _require_ticket(ticket)
     expected = f"approve {ticket['id']}"
     if approval != expected:
@@ -178,6 +181,9 @@ def main(argv=None) -> int:
     parser.add_argument("--confirm", default="")
     parser.add_argument("--state-dir", default=None)
     args = parser.parse_args(argv)
+    if not enabled():
+        print(f"Not sent: {OFF}", file=sys.stderr)
+        return 2
     try:
         with open(args.ticket_file, encoding="utf-8") as handle:
             ticket = json.load(handle)

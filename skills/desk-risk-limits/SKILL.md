@@ -29,25 +29,6 @@ The one send a standing approval may cover on any network is **reduce-only prote
 
 The user's limits file may only be **stricter** than these. A file that sets a value looser than a ceiling is not applied: the Risk Manager REJECTs with `gate failed: limits file exceeds desk ceiling <name>`, keeps enforcing the ceiling, and asks the user to edit the file. The desk never edits the file itself, and no Bot may raise a ceiling.
 
-## 0b. US stocks (`DESK_VENUE=ibkr`)
-
-Section 0 is the perp desk. For US stocks and ETFs these ceilings replace it. The code is `scripts/ibkr_risk.py`. The user's file may only be stricter.
-
-| Ceiling | Value |
-| --- | --- |
-| max risk per trade | 1% of equity (NetLiquidation) |
-| max single position | 20% of equity |
-| max total open risk | 5% of equity |
-| max sector concentration | 35% of equity per GICS sector |
-| daily loss stop | -3% of start-of-day NetLiquidation, then no new risk |
-| leverage | 1x cash unless the limits file explicitly enables margin |
-| protective stop | mandatory, on the broker, GTC, bracketed with the entry |
-| standing approval to open or add | never |
-
-`shares = floor(risk_budget / (entry - stop + slippage + commission per share))`, then cap by the position limit, buying power and sector room. Shares are whole numbers, minimum 1. A tick is $0.01 at or above $1, otherwise $0.0001. A margin account under $25,000 is blocked from a new day trade when no day trades remain. A cash account must not spend unsettled money. Shorts stay off unless the limits file allows them. Outside regular hours, only an explicit outside-hours limit is allowed. A halt, or an unknown halt, blocks the send. Missing depth is unavailable, never zero.
-
-Orders are sent only by `scripts/ibkr_execute.py` after the user writes `approve IB-YYYYMMDD-NN`. The same id cannot be sent twice. Live needs `IBKR_LIVE=1`, `--live`, and the words `confirm live`. The default account is paper. A read-only market-data connector is never the write path.
-
 ## 1. Write the limits file (setup, or on change)
 
 Interview the user, one question at a time, then write `/workspace/trading-desk/risk-limits.md`. Version it (`v1`, `v2`...) and date every change. Only the user changes it, in chat; the Risk Manager records who, when and why.

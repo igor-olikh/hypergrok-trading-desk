@@ -81,7 +81,7 @@ class OpeningBellTest(unittest.TestCase):
     def test_json_unavailable_data_is_not_a_successful_empty_snapshot(self):
         with redirect_stdout(io.StringIO()) as output, redirect_stderr(io.StringIO()) as errors:
             with patch.object(opening_bell, "fetch_snapshot", side_effect=ValueError("missing market")):
-                self.assertEqual(opening_bell.main(["--json", "--venue", "hyperliquid"]), 1)
+                self.assertEqual(opening_bell.main(["--json"]), 1)
         self.assertEqual(json.loads(output.getvalue())["error"]["code"], "source_unavailable")
         self.assertEqual(errors.getvalue(), "")
 
@@ -131,7 +131,7 @@ class OpeningBellTest(unittest.TestCase):
                       [{"universe": [{"name": "ETH"}]}, []]))
         for meta in cases:
             with self.subTest(meta=meta), patch.object(opening_bell, "post_info", return_value=meta), patch.object(opening_bell, "fetch_books", return_value=[(None, BOOK)]), redirect_stdout(io.StringIO()) as output, redirect_stderr(io.StringIO()) as errors:
-                self.assertEqual(opening_bell.main(["--json", "--venue", "hyperliquid"]), 1)
+                self.assertEqual(opening_bell.main(["--json"]), 1)
                 self.assertEqual(json.loads(output.getvalue())["error"]["code"], "source_unavailable")
                 self.assertEqual(errors.getvalue(), "")
 

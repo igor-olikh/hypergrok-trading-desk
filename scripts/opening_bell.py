@@ -388,13 +388,10 @@ def render(snapshot: dict) -> str:
 def main(argv=None) -> int:
     argv = list(sys.argv[1:] if argv is None else argv)
     parser = ReadOnlyParser(description=__doc__, machine_readable="--json" in argv or "--schema" in argv)
-    parser.add_argument("--coin", default=None, help="Hyperliquid perp coin, e.g. ETH or xyz:TSLA")
-    parser.add_argument("--symbol", default=None, help="US stock or ETF ticker; selects the IBKR venue")
-    parser.add_argument("--venue", choices=("ibkr", "hyperliquid"), default=None)
+    parser.add_argument("--coin", default="ETH", help="perp coin, e.g. ETH, kPEPE or xyz:TSLA")
     parser.add_argument("--dex", help="explicit HIP-3 DEX; also inferred from a prefixed coin")
     add_network_arguments(parser)
     parser.add_argument("--fixture-dir", help=argparse.SUPPRESS)
-    parser.add_argument("--fixture-quote", help=argparse.SUPPRESS)
     parser.add_argument("--json", action="store_true", help="print machine-readable JSON")
     args = parser.parse_args(argv)
     if args.schema:
@@ -409,19 +406,7 @@ def main(argv=None) -> int:
         }), indent=2))
         return 0
     base_url, _ = network_settings(args, parser)
-    if args.symbol and (args.coin or args.dex):
-        parser.error("pass --symbol for IBKR or --coin for Hyperliquid, not both")
-    if args.venue:
-        venue = args.venue
-    elif args.symbol:
-        venue = "ibkr"
-    elif args.coin or args.dex:
-        venue = "hyperliquid"
-    else:
-        venue = os.environ.get("DESK_VENUE", "ibkr")
-    if venue == "ibkr":
-        return run_ibkr(args, parser)
-    coin = (args.coin or "ETH").strip()
+    coin = args.coin.strip()
     if not coin or not re.fullmatch(r"[A-Za-z0-9@_-]+(?::[A-Za-z0-9@_-]+)?", coin):
         parser.error("coin contains unsupported characters")
     prefix = coin.split(":", 1)[0] if ":" in coin else None
@@ -439,34 +424,6 @@ def main(argv=None) -> int:
             print(f"Opening Bell unavailable: {exc}", file=sys.stderr)
         return 1
     print(json.dumps(snapshot, indent=2, sort_keys=True) if args.json else render(snapshot))
-    return 0
-
-
-def run_ibkr(args, parser) -> int:
-    from ibkr_market import build_stock_snapshot, render_stock
-
-    if args.testnet or args.dex:
-        parser.error("testnet and dex are Hyperliquid flags")
-    symbol = (args.symbol or "SPY").strip().upper()
-    if not re.fullmatch(r"[A-Z][A-Z0-9.]{0,7}", symbol):
-        parser.error("symbol must be a US ticker")
-    try:
-        if args.fixture_quote:
-            with open(args.fixture_quote, encoding="utf-8") as handle:
-                quote = json.load(handle)
-            quote["symbol"] = symbol
-            quote["network"] = "fixture"
-        else:
-            from ibkr_client import client_from_env
-            quote = client_from_env(args.timeout).get_quote(symbol)
-        snapshot = build_stock_snapshot(quote)
-    except (OSError, ValueError, KeyError, TypeError, DecimalException, OverflowError, Exception) as exc:
-        if args.json:
-            emit_error("source_unavailable", str(exc))
-        else:
-            print(f"Opening Bell unavailable: {exc}", file=sys.stderr)
-        return 1
-    print(json.dumps(snapshot, indent=2, sort_keys=True) if args.json else render_stock(snapshot))
     return 0
 
 
