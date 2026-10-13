@@ -1,14 +1,18 @@
-# Run this desk with Interactive Brokers
+# Акции через Interactive Brokers
 
-This is the stock path. The original `README.md` stays the Hyperliquid desk and is not the setup for US stocks.
+Это отдельная инструкция. Файл `README.md` про крипто-стол. Его не меняем и по нему акции не запускают.
 
-The stock commands live in their own files. They do nothing until `DESK_VENUE=ibkr`. They talk to the Interactive Brokers Client Portal Gateway on this computer. They do not read a `.env` file by themselves. They do not send an order unless you later approve one ticket by its exact id.
+Иди по шагам сверху вниз. Не перескакивай. В конце каждого шага написано, как понять, что он получился.
 
-Use a paper login until you mean to use a live account. A paper account id starts with `DU`. A live account id starts with `U`. The examples below use the fake id `DU0000000`.
+Читать цену можно. Заявка сама не уходит. Отправка — только шаг 9, и только если ты сам этого хочешь.
 
-## 1. Get the fork
+На экране часть фраз по-английски. Ниже рядом написано, что они значат.
 
-The stock files are on this fork, not on the original Hyperliquid repository.
+Пример номера счёта везде выдуманный: `DU0000000`. Свой настоящий номер в эту папку и на GitHub не клади.
+
+## Шаг 1. Открыть папку проекта
+
+На Маке открой программу «Терминал». Вставь две строки и нажми Enter после каждой.
 
 ```bash
 git clone https://github.com/igor-olikh/hypergrok-trading-desk.git
@@ -16,49 +20,68 @@ cd hypergrok-trading-desk
 python3 --version
 ```
 
-Python 3 is enough. There is no package to install for these commands.
+Если папка уже есть, первую строку пропусти. Зайди в неё командой `cd` и путём к папке.
 
-## 2. Turn the stock tools on
+**Шаг 1 получился, если** последняя строка начинается с `Python 3`. Отдельные программы для этих команд ставить не нужно.
 
-In the same terminal:
+Не получился, если написано `command not found`. Тогда на этом компьютере нет `git` или `python3`. Поставь то, чего не хватает, и повтори шаг.
+
+## Шаг 2. Включить акции, брокера ещё не трогать
+
+В том же окне:
 
 ```bash
 export DESK_VENUE=ibkr
-```
-
-Close the terminal and this switch is gone. Set it again next time.
-
-Check that the desk files are intact before you involve the broker:
-
-```bash
 python3 scripts/ibkr_doctor.py --offline --json
 ```
 
-You want a row named `ibkr gateway` with status `SKIP`. That means the broker was not contacted. Fix any `FAIL` row in that output before going on.
+**Шаг 2 получился, если** в ответе есть строка `"name": "ibkr gateway"` и рядом `"status": "SKIP"`, а слова `"status": "FAIL"` нет. `SKIP` здесь значит: брокера не спрашивали. Это нормально.
 
-## 3. Start the gateway
+Не получился, если видишь:
 
-The scripts use the Client Portal Gateway, the small local program from Interactive Brokers. They do not use the TWS socket API.
+`DESK_VENUE is not ibkr, so this tool stays off.`
 
-1. Install Java if `java -version` fails. Use the Java link on the [Client Portal quick start](https://www.interactivebrokers.com/docs/web-api/api/web-api/quick-start).
-2. Download the gateway from that same page and unzip it.
-3. In a second terminal, from the unzipped `clientportal.gw` folder:
+Это значит: акции выключены. Снова введи `export DESK_VENUE=ibkr` в этом же окне.
+
+Закроешь окно терминала — настройка сотрётся. На новом заходе шаг 2 надо повторить.
+
+## Шаг 3. Проверить, что стоит Java
+
+Программа брокера без Java не стартует.
+
+```bash
+java -version
+```
+
+**Шаг 3 получился, если** есть строка с номером версии, например `openjdk version` или `java version`.
+
+Не получился, если написано, что команды `java` нет. Поставь Java по ссылке со страницы [короткого старта Interactive Brokers](https://www.interactivebrokers.com/docs/web-api/api/web-api/quick-start) и повтори `java -version`.
+
+## Шаг 4. Запустить программу брокера и войти
+
+Нужна программа Client Portal Gateway с той же страницы. Это не торговая программа TWS. Скачай архив и распакуй его. Внутри будет папка `clientportal.gw`.
+
+Открой **второе** окно терминала. Первое не закрывай. Зайди в распакованную папку и запусти:
 
 ```bash
 bin/run.sh root/conf.yaml
 ```
 
-On Windows the same step is `bin\run.bat root\conf.yaml`. Leave that window open.
+На Windows та же команда: `bin\run.bat root\conf.yaml`.
 
-4. Open `https://localhost:5000` in a browser. The certificate warning is normal for this local program. Continue.
-5. Log in with the paper username. Log out of TWS, the phone app, and the website first if the gateway will not accept the login.
-6. Wait until the page says the client login succeeded.
+Окно не закрывай. Пока оно открыто, программа брокера работает.
 
-On a Mac, port 5000 is often taken by AirPlay. If the gateway cannot start, open `root/conf.yaml` in the gateway folder and change `listenPort` from `5000` to `5001`. Save, start the gateway again, and use `https://localhost:5001` in the browser. Interactive Brokers documents this on [How to modify the Client Portal Gateway port](https://www.interactivebrokers.com/docs/web-api/authentication/cpgw/how-to-modify-the-client-portal-gateway-port).
+Дальше открой в браузере адрес `https://localhost:5000`. Браузер напишет, что сертификат незнакомый. Для этой местной программы так и должно быть. Нажми продолжить.
 
-## 4. Point the desk at the gateway
+Войди **бумажным** логином. Если сайт не пускает, сначала выйди из счёта в TWS, в телефоне и на сайте брокера, потом войди здесь снова.
 
-Back in the desk terminal:
+**Шаг 4 получился, если** страница пишет, что вход удался (`Client login succeeds`), и второе окно терминала всё ещё открыто.
+
+На Маке порт 5000 часто занят AirPlay. Если программа брокера не стартует, открой файл `root/conf.yaml` в её папке и замени `listenPort: 5000` на `listenPort: 5001`. Сохрани. Запусти программу снова. В браузере открой `https://localhost:5001`. Как менять порт, написано у брокера: [смена порта](https://www.interactivebrokers.com/docs/web-api/authentication/cpgw/how-to-modify-the-client-portal-gateway-port).
+
+## Шаг 5. Написать три настройки
+
+Вернись в **первое** окно, то, где папка проекта.
 
 ```bash
 export DESK_VENUE=ibkr
@@ -66,11 +89,24 @@ export IBKR_GATEWAY_URL=https://localhost:5000
 export IBKR_ACCOUNT_ID=DU0000000
 ```
 
-Use your own paper id in place of `DU0000000`. If you changed the port, change the URL too.
+Вместо `DU0000000` напиши свой бумажный номер. Он начинается с `DU`. Если на шаге 4 ты сменил порт на 5001, в адресе тоже напиши `5001`.
 
-You can skip `IBKR_ACCOUNT_ID` only when the gateway returns exactly one account. If it returns more than one, the read stops and asks you to set the id.
+Проверка:
 
-Do not put these values in a `.env` file inside this repository. The original ignore list does not hide that file, and `bash scripts/check_ibkr.sh` refuses to pass while `.env` is here. Keep a private copy outside the repo if you want the lines saved, then load it into the terminal:
+```bash
+echo "$DESK_VENUE"
+echo "$IBKR_GATEWAY_URL"
+```
+
+**Шаг 5 получился, если** первая строка ответа — `ibkr`, вторая — тот адрес, который ты открывал в браузере.
+
+Номер счёта можно не задавать только тогда, когда у входа ровно один счёт. Если счетов больше одного, чтение остановится и попросит номер.
+
+Не копируй эти строки в файл `.env` внутри папки проекта. Проверка репозитория такой файл не пропустит. Если хочешь сохранить строки, положи файл **вне** проекта, например в домашнюю папку:
+
+`~/.hypergrok/ibkr.env`
+
+Потом в терминале:
 
 ```bash
 set -a
@@ -78,45 +114,69 @@ source "$HOME/.hypergrok/ibkr.env"
 set +a
 ```
 
-Placeholders you may copy are in `.env.example`.
+Образец имён без настоящих данных лежит в `.env.example`.
 
-## 5. Read a price
+## Шаг 6. Прочитать цену
+
+```bash
+python3 scripts/ibkr_opening_bell.py --symbol SPY
+```
+
+**Шаг 6 получился, если** первая строка такая:
+
+`HYPERGROK OPENING BELL — SPY`
+
+и ниже есть строка `Last` с ценой. Внизу написано `No order created or sent`. Это значит: заявку никто не отправил.
+
+Строка `Depth unavailable` — нормально. Стакана нет, это не ноль.
+
+Не получился, если написано `Opening Bell unavailable` или `gateway unreachable`. Программа брокера не ответила. Проверь, что окно из шага 4 открыто и вход на странице живой. Вход со временем протухает: открой страницу и войди снова.
+
+## Шаг 7. Проверить, что брокер на связи
+
+```bash
+python3 scripts/ibkr_doctor.py
+```
+
+**Шаг 7 получился, если** в списке есть три строки:
+
+- `PASS  ibkr auth` и слова `gateway session is authenticated` — вход живой
+- `PASS  ibkr account` и слова `paper account` — это бумажный счёт
+- нет строки `FAIL`
+
+Если счёт боевой, вместо второй строки будет `WARN` и слова `live account`. Чтение при этом работает. Отправка сама не включится.
+
+В этом тексте не должно быть твоего номера счёта.
+
+Не получился, если есть `FAIL  ibkr gateway` и слово `unavailable`. Программа брокера не ответила. Повтори шаг 4.
+
+## Шаг 8. По желанию сохранить дневные цены
+
+Этот шаг не обязателен. Чтение цены на шаге 6 уже работает без него.
+
+```bash
+python3 scripts/ibkr_research.py --symbol SPY --output "$HOME/.hypergrok/spy-bars"
+```
+
+**Шаг 8 получился, если** последняя строка начинается с `Dataset complete:`. Рядом будет папка с файлами `candles.csv` и `manifest.json`. Папка должна быть новой. Если она уже есть, команда остановится. Возьми другое имя папки.
+
+Не получился, если просишь `--with-funding`. Для акций США такой истории нет. Команда откажется.
+
+## Шаг 9. Отправить заявку, только если сам решил
+
+Шаги 1–7 заявку не отправляют. Этот шаг отправляет одну покупку: лимитная покупка и защитная продажа-стоп на то же число акций. Один номер заявки уходит один раз. Второй раз тот же номер будет отвергнут.
+
+Пока не готов — не делай этот шаг.
+
+Сначала запиши файл заявки у себя дома, не в папке проекта. Пример ниже выдуманный. Подставь свои числа. Номер бумаги `conid` возьми из ответа шага 6, если читал с `--json`.
 
 ```bash
 python3 scripts/ibkr_opening_bell.py --symbol SPY --json
 ```
 
-A good read prints a snapshot and exits 0. `depth` is `unavailable` when the book is not subscribed. That is not a zero book.
+В том ответе поле `conid` — номер бумаги у брокера.
 
-If the gateway is down or the login has expired, the command exits 1 and says the source is unavailable. Log in again in the browser. The gateway login does not last forever.
-
-Then:
-
-```bash
-python3 scripts/ibkr_doctor.py --json
-```
-
-A live gateway check should not print the account id. `FAIL` on `ibkr gateway` means the gateway did not answer. The detail stays `unavailable` on purpose.
-
-Daily bars, written outside the repo:
-
-```bash
-python3 scripts/ibkr_research.py --symbol SPY --output "$HOME/.hypergrok/spy-bars" --json
-```
-
-US stocks have no funding history. `--with-funding` is refused.
-
-## 6. Send only when you mean it
-
-Reading does not send. A send is a separate command, one ticket, one time. The same ticket id is refused the second time.
-
-The journal is outside the repo, in `~/.hypergrok/trading-desk`, unless you set `DESK_STATE_DIR`.
-
-This desk sends one long limit buy plus a sell stop of the same size. The approval text must be exactly `approve IB-YYYYMMDD-NN` for that ticket. A paper ticket also requires a paper account. Do not pass `--live` for paper.
-
-A live send needs all three, and a live account: `IBKR_LIVE=1`, `--live`, and the words `confirm live`. Leave those off.
-
-Build the ticket yourself from numbers you accept. The file below is a fake shape, not an order to use:
+Файл заявки, например `~/.hypergrok/ticket.json`:
 
 ```json
 {
@@ -138,38 +198,138 @@ Build the ticket yourself from numbers you accept. The file below is a fake shap
 }
 ```
 
-Replace `conid`, prices, size, and the id. `conid` comes from the quote you just read. Then:
+Потом, для бумажного счёта, без боевых флагов:
 
 ```bash
 python3 scripts/ibkr_execute.py --ticket-file "$HOME/.hypergrok/ticket.json" --approve "approve IB-20261013-01"
 ```
 
-The risk rules can still refuse the send. The ceilings are in the next section. A refusal prints `Not sent:` and does not call the broker.
+Слова после `--approve` должны совпасть с номером в файле. Для примера выше это ровно `approve IB-20261013-01`.
 
-## Ceilings
+**Шаг 9 получился, если** ответ — одна строка JSON и в ней `"state": "sent"`.
 
-Your own limits may only be stricter. The code is `scripts/ibkr_risk.py`.
+Не получился, если строка начинается с `Not sent:`. Заявка не ушла. Прочитай английскую фразу после двоеточия. Частые причины:
 
-| Ceiling | Value |
-| --- | --- |
-| max risk per trade | 1% of equity |
-| max single position | 20% of equity |
-| max total open risk | 5% of equity |
-| max sector concentration | 35% of equity |
-| daily loss stop | -3% of start-of-day equity, then no new risk |
-| leverage | 1x cash unless you explicitly enable margin |
-| protective stop | required, on the broker, GTC, bracketed with the entry |
-| standing approval to open or add | never |
+- `approval must be exactly` — фраза подтверждения не совпала с номером
+- `paper ticket requires a paper account` — в файле бумага, а счёт боевой, или наоборот
+- `halt is not clearly false` — в файле нет ясного `halted: false`
+- `session does not allow this order` — сейчас не обычные часы биржи, а разрешение на другие часы не стоит
+- `ticket ... was already sent` — этот номер уже уходил
+- `DESK_VENUE is not ibkr` — повтори шаг 2
 
-Shares are whole numbers, minimum 1. Outside regular hours, only an explicit outside-hours limit is allowed. A halt blocks the send. Shorts stay off unless you allow them.
+Боевой счёт этим примером не откроешь. Для боя нужны сразу три вещи, и счёт должен быть боевым: настройка `IBKR_LIVE=1`, флаг `--live` и слова `--confirm "confirm live"`. Пока не решил торговать боем — не задавай их.
 
-## If you change the repo
+Память об отправленных номерах лежит вне проекта, в папке `~/.hypergrok/trading-desk`.
+
+## Все настройки, по одной
+
+Пустая настройка значит: берётся значение по умолчанию.
+
+### Настройки окна терминала
+
+`DESK_VENUE` — выключатель. Ровно `ibkr` включает акции. Любое другое слово или пусто — команды акций сразу останавливаются. После закрытия окна вводить снова.
+
+`IBKR_GATEWAY_URL` — адрес программы брокера. По умолчанию `https://localhost:5000`. Если менял порт, сюда тот же порт.
+
+`IBKR_ACCOUNT_ID` — номер счёта. Бумажный начинается с `DU`. Боевой начинается с `U`. В примерах стоит фальшивка `DU0000000`. Можно не задавать, только если у входа ровно один счёт.
+
+`IBKR_LIVE` — разрешение на боевую отправку. Нужно ровно `1`. Пока не задано, бой не уйдёт. Для бумаги не задавай.
+
+`DESK_STATE_DIR` — папка, где стол помнит уже отправленные номера. По умолчанию `~/.hypergrok/trading-desk`. Это вне проекта.
+
+### Чтение цены: `scripts/ibkr_opening_bell.py`
+
+`--symbol` — буквы тикера, например `SPY`. Если не писать, будет `SPY`. Можно точку, как в `BRK.B`. До 8 знаков.
+
+`--json` — ответ блоком для машины, а не строками. Нужен, чтобы увидеть номер бумаги `conid`. Без него ответ короче и его проще читать глазами.
+
+`--timeout` — сколько секунд ждать ответ брокера. По умолчанию 15. Больше имеет смысл только при медленной связи.
+
+`--fixture-quote` — служебный. Для человека не нужен. Читает цену из файла, а не у брокера.
+
+### Проверка связи: `scripts/ibkr_doctor.py`
+
+`--offline` — не звонить брокеру. Для шага 2.
+
+`--json` — ответ блоком. Без него список строками и внизу строка `Result`.
+
+`--timeout` — сколько секунд ждать брокера. По умолчанию 15. При `--offline` брокер не вызывается.
+
+`--repo-root` — папка проекта. По умолчанию эта папка. Обычно не задают.
+
+`--desk-root` — дополнительная папка уже подготовленного стола. Для первого запуска не нужна.
+
+### Дневные цены: `scripts/ibkr_research.py`
+
+`--symbol` — тикер. Обязателен.
+
+`--output` — новая папка, куда сохранить цены. Обязательна. Папка не должна уже существовать.
+
+`--json` — в конце напечатать короткую карточку вместо одной строки `Dataset complete`.
+
+`--timeout` — сколько секунд ждать брокера. По умолчанию 15.
+
+`--with-funding` — не использовать. Для акций команда сразу откажется.
+
+`--fixture-bars` — служебный. Для человека не нужен.
+
+### Отправка: `scripts/ibkr_execute.py`
+
+`--ticket-file` — путь к файлу заявки. Обязателен.
+
+`--approve` — фраза подтверждения. Должна быть ровно `approve` и номер из файла, например `approve IB-20261013-01`. Пустая фраза заявку не отправляет.
+
+`--live` — флаг боя. Для бумаги не ставь. С бумажным файлом команда откажется.
+
+`--confirm` — вторая фраза для боя. Нужны ровно слова `confirm live`, вместе с `--live` и `IBKR_LIVE=1`.
+
+`--state-dir` — папка памяти об отправленных номерах для этого запуска. Если не задана, берётся `DESK_STATE_DIR`, а если и его нет — `~/.hypergrok/trading-desk`.
+
+### Поля файла заявки
+
+`id` — номер заявки. Вид ровно `IB-ГГГГММДД-NN`, например `IB-20261013-01`.
+
+`mode` — `paper` для бумаги или `live` для боя.
+
+`account_kind` — то же словами: `paper` или `live`. Должно совпасть со счётом у брокера.
+
+`symbol` — тикер, например `SPY`.
+
+`conid` — номер этой бумаги у брокера. Берётся из чтения цены с `--json`. В примере стоит `0`, его надо заменить.
+
+`side` — только `BUY`. Эта команда покупает, не продаёт в шорт.
+
+`qty` — целое число акций, минимум 1.
+
+`order_type` — только `LMT`. Это лимитная цена, не рыночная.
+
+`limit` — твоя цена покупки. Для цены от 1 доллара шаг 1 цент. Например `100.00`.
+
+`tif` — сколько жить заявке на покупку. `DAY` значит до конца дня.
+
+`stop` — цена защитной продажи. Тоже на шаг цены.
+
+`stop_qty` — сколько акций закрыть стопом. Должно равняться `qty`.
+
+`session` — какие сейчас часы. `regular` — обычная сессия, примерно 9:30–16:00 по Нью-Йорку. `pre` — до открытия. `post` — после закрытия. `closed` — отправка не пройдёт.
+
+`halted` — остановка торгов по бумаге. Для отправки нужно ровно `false`.
+
+`last` — последняя цена, с которой сравнивают лимит. Если цена уехала от лимита дальше допуска, отправка встанет. Можно не писать.
+
+`outside_rth` — `true`, только если сознательно разрешаешь заявку до открытия или после закрытия. Вместе с `session` равным `pre` или `post`. Иначе не пиши.
+
+`max_slippage_bps` — насколько последняя цена может отличаться от лимита. По умолчанию 10. Это 0,10%. Можно не писать.
+
+`risk_usd` — сколько долларов рискнёшь, если сработает стоп. Сама команда отправки это поле не проверяет. Оно нужно отдельной проверке риска.
+
+Потолки этой проверки, если её вызывают: не больше 1% счёта на одну сделку, не больше 20% счёта в одной бумаге, не больше 5% открытого риска, не больше 35% в одном секторе, дневной убыток не хуже 3% от начала дня, плечо не выше 1, пока его отдельно не разрешили. Короткая продажа выключена. Стоп обязателен.
+
+## Если правишь сам проект
 
 ```bash
 bash scripts/check.sh
 bash scripts/check_ibkr.sh
 ```
 
-The second command needs `gitleaks` on the machine. It also fails if `.env` is inside the repo.
-
-`hooks/ibkr_write_gate.py` asks before a command that looks like an order, and only when `DESK_VENUE=ibkr`. The published plugin still loads the original Hyperliquid hook. The send script is what blocks an order that lacks the exact approval line.
+Вторая команда требует программу `gitleaks` и отказывается работать, если внутри проекта лежит файл `.env`.
