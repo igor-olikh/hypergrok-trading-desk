@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.6.1 - 2026-10-13
+
+Tagged and published to npm. Adds Gemini CLI and Codex install paths; no skill, role or rule content changed beyond the bootstrap's release pins. The public Grok Bot template was republished for this release at https://x.ai/bot/3Fjt0kR65RoGjj5JNZJWp; its stored bootstrap body was read back against the tag. 1.6.0 shipped without a template refresh.
+
++ Add a Gemini CLI extension manifest, `gemini-extension.json`, with a short `GEMINI.md` context file. Gemini CLI loads the seventeen skills; its subagent schema rejects the extra frontmatter in `agents/`, so `GEMINI.md` names the roles, says they run as labelled passes and repeats the desk rule's approval paragraph verbatim. The format follows the official extension reference and has no native installation proof yet.
++ Add a Codex repository marketplace, `.agents/plugins/marketplace.json`, which Codex reads before the Claude-compatible index. Its entry pins this repository at the release tag, like the Grok index, with the install policy and category Codex requires. Codex CLI 0.160.0 installed 1.6.0 through it and listed all seventeen skills.
++ Extend `check_manifests.py` and its negative fixtures to both manifests, the Gemini context file and the documented Gemini and Codex install commands. Document both runtimes in the README, FAQ and architecture notes, and record in the release steps that a lone GitHub release asset would replace the tagged source for Gemini CLI.
+
 ## 1.6.0 - 2026-10-12
 
 Tagged and published to npm. The public Grok Bot template still carries 1.5.0 and is being refreshed; `template/grok-bot.json` stays `ready-to-publish` until the new share is verified.
