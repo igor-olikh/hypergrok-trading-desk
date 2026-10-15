@@ -90,7 +90,7 @@ class OpeningBellTest(unittest.TestCase):
         book = {**BOOK, "coin": "xyz:TSLA"}
         with patch.object(opening_bell, "post_info", return_value=meta) as request, patch.object(opening_bell, "fetch_books", return_value=[(None, book)]) as books:
             snapshot = opening_bell.fetch_snapshot("tsla", opening_bell.DEFAULT_BASE_URL, 15, dex="xyz")
-        request.assert_called_once_with(opening_bell.DEFAULT_BASE_URL, {"type": "metaAndAssetCtxs", "dex": "xyz"}, 15)
+        request.assert_called_once_with(opening_bell.DEFAULT_BASE_URL, {"type": "metaAndAssetCtxs", "dex": "xyz"}, 15, opening_bell.USER_AGENT)
         books.assert_called_once_with("xyz:TSLA", opening_bell.DEFAULT_BASE_URL, 15)
         self.assertEqual(snapshot["coin"], "xyz:TSLA")
         self.assertEqual(snapshot["dex"], "xyz")

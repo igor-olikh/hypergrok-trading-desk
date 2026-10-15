@@ -53,6 +53,8 @@ Chat is where the desk talks; files are where it remembers.
 
 The Market Analyst hands the complete bundle to the Strategist, who runs offline `--verify` before analysis. Verification replays responses and checks files and claimed coverage; it cannot authenticate an exchange response or prove historical universe membership. A missing hour stays missing. Run records cite the bundle and manifest hash so changed data cannot silently replace a prior experiment. See [Research datasets](RESEARCH_DATASETS.md) for the contract and limitations.
 
+`scripts/stop_cost.py` runs on the read plane too. It reads public market metadata and the L2 book and applies the `desk-risk-limits` sizing arithmetic to a plan and equity the user types, so it prices a stop without an account read.
+
 Data completeness, statistical evidence, Risk PASS and a user's exact ticket approval are separate decisions. The dataset tool does not supply historical oracle prices, reconstruct intrabar fills, read an account or touch an exchange write path.
 
 ## Trust boundaries

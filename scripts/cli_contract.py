@@ -3,6 +3,7 @@
 import argparse
 import json
 import math
+import re
 from urllib.parse import urlsplit
 
 MAINNET = "https://api.hyperliquid.xyz"
@@ -51,6 +52,20 @@ def network_settings(args, parser):
         parser.error("base-url must be an HTTP(S) origin without credentials, path, query or fragment")
     network = "mainnet" if base == MAINNET else "testnet" if base == TESTNET else "custom"
     return base, network
+
+
+def market_selection(parser, coin, dex):
+    """Validate a perp coin and optional HIP-3 DEX; a prefixed coin selects its DEX."""
+    coin = coin.strip()
+    if not coin or not re.fullmatch(r"[A-Za-z0-9@_-]+(?::[A-Za-z0-9@_-]+)?", coin):
+        parser.error("coin contains unsupported characters")
+    prefix = coin.split(":", 1)[0] if ":" in coin else None
+    selected = dex or prefix
+    if selected and not re.fullmatch(r"[a-z][a-z0-9_-]*", selected):
+        parser.error("dex must be a lowercase DEX name")
+    if dex and prefix and dex != prefix:
+        parser.error("coin prefix and dex must match")
+    return coin, selected
 
 
 def describe(command, success):

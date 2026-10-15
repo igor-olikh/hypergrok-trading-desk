@@ -10,16 +10,16 @@ from __future__ import annotations
 import argparse
 import json
 import os
-import re
 import sys
 import urllib.error
 import urllib.request
 from datetime import datetime, timezone
 from decimal import Decimal, DecimalException, InvalidOperation
 
-from cli_contract import ReadOnlyParser, add_network_arguments, describe, emit_error, network_settings
+from cli_contract import ReadOnlyParser, add_network_arguments, describe, emit_error, market_selection, network_settings
 
 DEFAULT_BASE_URL = "https://api.hyperliquid.xyz"
+USER_AGENT = "hypergrok-opening-bell/1.0"
 BANDS_BPS = (5, 10, 25)
 # `l2Book` returns at most this many price levels per side, at whatever price
 # resolution was asked for. At full resolution twenty levels stop a few bps from
@@ -33,12 +33,12 @@ FULL_PRECISION = "full precision"
 COARSER_RESOLUTIONS = (4, 3)
 
 
-def post_info(base_url: str, payload: dict, timeout: float = 15.0):
+def post_info(base_url: str, payload: dict, timeout: float = 15.0, user_agent: str = USER_AGENT):
     body = json.dumps(payload).encode("utf-8")
     request = urllib.request.Request(
         f"{base_url.rstrip('/')}/info",
         data=body,
-        headers={"Content-Type": "application/json", "User-Agent": "hypergrok-opening-bell/1.0"},
+        headers={"Content-Type": "application/json", "User-Agent": user_agent},
         method="POST",
     )
     with urllib.request.urlopen(request, timeout=timeout) as response:
@@ -147,11 +147,12 @@ def measures(views: list[dict], band_bps: int) -> bool:
     )
 
 
-def request_book(base_url: str, coin: str, n_sig_figs: int | None, timeout: float) -> dict:
+def request_book(base_url: str, coin: str, n_sig_figs: int | None, timeout: float,
+                 user_agent: str = USER_AGENT) -> dict:
     payload = {"type": "l2Book", "coin": coin}
     if n_sig_figs is not None:
         payload["nSigFigs"] = n_sig_figs
-    return post_info(base_url, payload, timeout)
+    return post_info(base_url, payload, timeout, user_agent)
 
 
 def fetch_books(coin: str, base_url: str, timeout: float) -> list[tuple[int | None, dict]]:
@@ -304,18 +305,25 @@ def build_snapshot(meta_and_contexts, pages: list[tuple[int | None, dict]], coin
     }
 
 
-def fetch_snapshot(coin: str, base_url: str, timeout: float, fixture_dir: str | None = None, dex: str | None = None) -> dict:
+def read_market(coin: str, base_url: str, timeout: float, fixture_dir: str | None = None,
+                dex: str | None = None, user_agent: str = USER_AGENT):
+    """Market metadata and the canonical coin, resolved before any book is requested."""
     if fixture_dir:
         meta = load_fixture(fixture_dir, "metaAndAssetCtxs", coin)
-        coin = resolve_coin(meta, coin, dex)
-        pages = load_books(fixture_dir, coin)
-        network = "fixture"
     else:
         request = {"type": "metaAndAssetCtxs"}
         if dex:
             request["dex"] = dex
-        meta = post_info(base_url, request, timeout)
-        coin = resolve_coin(meta, coin, dex)  # fail before any book request
+        meta = post_info(base_url, request, timeout, user_agent)
+    return meta, resolve_coin(meta, coin, dex)
+
+
+def fetch_snapshot(coin: str, base_url: str, timeout: float, fixture_dir: str | None = None, dex: str | None = None) -> dict:
+    meta, coin = read_market(coin, base_url, timeout, fixture_dir, dex)
+    if fixture_dir:
+        pages = load_books(fixture_dir, coin)
+        network = "fixture"
+    else:
         pages = fetch_books(coin, base_url, timeout)
         network = "mainnet" if base_url == DEFAULT_BASE_URL else "testnet" if base_url == "https://api.hyperliquid-testnet.xyz" else "custom"
     snapshot = build_snapshot(meta, pages, coin, network)
@@ -406,15 +414,7 @@ def main(argv=None) -> int:
         }), indent=2))
         return 0
     base_url, _ = network_settings(args, parser)
-    coin = args.coin.strip()
-    if not coin or not re.fullmatch(r"[A-Za-z0-9@_-]+(?::[A-Za-z0-9@_-]+)?", coin):
-        parser.error("coin contains unsupported characters")
-    prefix = coin.split(":", 1)[0] if ":" in coin else None
-    dex = args.dex or prefix
-    if dex and not re.fullmatch(r"[a-z][a-z0-9_-]*", dex):
-        parser.error("dex must be a lowercase DEX name")
-    if args.dex and prefix and args.dex != prefix:
-        parser.error("coin prefix and dex must match")
+    coin, dex = market_selection(parser, args.coin, args.dex)
     try:
         snapshot = fetch_snapshot(coin, base_url, args.timeout, args.fixture_dir, dex)
     except (OSError, ValueError, KeyError, TypeError, DecimalException, OverflowError) as exc:

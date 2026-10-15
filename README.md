@@ -4,15 +4,29 @@
 
 <h1 align="center">HyperGrok</h1>
 
-<p align="center"><strong>Turn your Grok Bot into a 7-agent Hyperliquid trading desk.</strong></p>
+<p align="center"><strong>Grok Bot for Hyperliquid. Seven agents, one writer, your approval.</strong></p>
 
-HyperGrok is an open-source Hyperliquid trading desk for AI agents: seven role profiles and seventeen agent skills for research, risk, execution and review. It runs in Grok Bot and installs as a plugin in Claude Code, Cursor and Grok Build. It starts read-only on public market data; trading needs your own API wallet and a ticket you approve.
+<p align="center">Works in <a href="#start">Grok Bot</a> · <a href="docs/hyperliquid-claude-code.md">Claude Code</a> · <a href="docs/hyperliquid-cursor.md">Cursor</a> · <a href="docs/hyperliquid-codex.md">Codex</a> · <a href="docs/hyperliquid-gemini-cli.md">Gemini CLI</a> · <a href="docs/hyperliquid-grok-build.md">Grok Build</a></p>
 
-Set up the Desk Lead in Grok Bot using the pinned bootstrap below. It opens with a live, zero-key Hyperliquid market snapshot, builds research, risk, execution and review as separate agents, then proves the floor is ready. They brief you on markets, size your trades, send what you approve and tell you honestly how it went. You bring the ideas. Let them cook.
+HyperGrok is an open-source Hyperliquid trading desk for AI agents: seven role profiles and seventeen agent skills for research, risk, execution and review. It runs in Grok Bot and installs as a plugin in Claude Code, Cursor, Codex, Gemini CLI and Grok Build. It starts read-only on public market data; trading needs your own API wallet and a ticket you approve.
+
+<p align="center">
+  <img src="assets/ticket-hg-20260816-01.png" width="760" alt="Worked example: the Risk Manager posts ticket HG-20260816-01 for 0.4827 ETH, sized on a stressed stop of 105.65 per ETH; the user replies approve HG-20260816-01; the Execution Trader sends entry and stop once as one grouped order and confirms it on the book.">
+</p>
+
+## Try it now, no keys
+
+```bash
+git clone --depth 1 --branch v1.6.1 https://github.com/galleonlabs/hypergrok-trading-desk.git
+cd hypergrok-trading-desk
+python3 scripts/opening_bell.py --coin ETH
+```
+
+A live ETH snapshot from Hyperliquid's public `/info` endpoint: price, funding, open interest, spread and depth. It needs no wallet, account or key, and runs on Python 3's standard library.
 
 ## Start
 
-Open Grok Bot and paste this to a Bot:
+The Desk Lead in Grok Bot opens with the same zero-key market snapshot, builds research, risk, execution and review as separate agents, then proves the floor is ready. Open Grok Bot and paste this to a Bot:
 
 > Set up the HyperGrok trading desk from https://github.com/galleonlabs/hypergrok-trading-desk/blob/v1.6.1/skills/hypergrok-bootstrap/SKILL.md. Follow the bootstrap skill, use https://github.com/galleonlabs/hypergrok-trading-desk/blob/v1.6.1/SETUP.md for the complete runbook, and finish with its evidence receipt.
 
@@ -22,13 +36,7 @@ The desk starts in research mode. The first demo uses only Hyperliquid's public 
 
 ### Opening Bell
 
-The first thing the Desk Lead shows is useful, live output—not a configuration form:
-
-```bash
-python3 scripts/opening_bell.py --coin ETH
-```
-
-It reports source and UTC time, mid/mark/oracle, 24-hour change and volume, hourly funding, open interest, spread and depth at 5/10/25 bps. Twenty book levels stop a few bps from the mid on a liquid perp, so it re-reads the book at a coarser `nSigFigs` page until each band is measured, names the page every figure came from, and still marks a band no page reaches as a floor rather than a total. `scripts/desk_doctor.py` then checks the release, team files, the reviewed skill bytes, desk folders and public connectivity. Both are read-only and standard-library Python.
+The first thing the Desk Lead shows is that snapshot: live market output, not a configuration form. It reports source and UTC time, mid/mark/oracle, 24-hour change and volume, hourly funding, open interest, spread and depth at 5/10/25 bps. Twenty book levels stop a few bps from the mid on a liquid perp, so it re-reads the book at a coarser `nSigFigs` page until each band is measured, names the page every figure came from, and still marks a band no page reaches as a floor rather than a total. `scripts/desk_doctor.py` then checks the release, team files, the reviewed skill bytes, desk folders and public connectivity. Both are read-only and standard-library Python.
 
 For automated reads, inspect `--schema` without touching the network, then use `--json`. Success and errors have a versioned contract; a failed read remains unavailable, and incomplete depth and doctor warnings retain their meaning. Snapshots accept canonical mixed-case coins and explicit HIP-3 markets:
 
@@ -54,6 +62,8 @@ python3 scripts/research_dataset.py --verify /workspace/trading-desk/data/eth-se
 The bundle keeps requests, captured responses, observed CSV rows and a hashed manifest. Closed UTC windows, explicit missing ranges and bounded funding pagination distinguish `complete`, `incomplete` and `unavailable` history. Offline verification replays the saved responses; it checks consistency, not source authenticity or strategy quality. The tool needs no key and never fills a gap with synthetic data. See [Research datasets](docs/RESEARCH_DATASETS.md) for the supported intervals, market selection, exit codes and analyst handoff.
 
 ## Meet the desk
+
+They brief you on markets, size your trades, send what you approve and tell you honestly how it went. You bring the ideas. Let them cook.
 
 | Bot | What they do for you |
 | --- | --- |
@@ -115,7 +125,7 @@ Neither is required to use HyperGrok. Installing instructions does not connect a
 
 - **You approve every trade**, by ticket id, after seeing the exact order. The line you type is evidence; the gate that enforces it sits outside the chat, in Grok Bot's own Require Approval rule, because a Bot that can read an approval could also write one.
 - **A trade-only API wallet**, provisioned through Grok Bot's secure secret store, is the only key the desk ever holds. It can trade; it cannot withdraw.
-- **Sized on a stressed stop.** A triggered stop is a market order: it slips and pays taker on both legs. The desk sizes on what the stop will actually cost, not its trigger price, so your risk budget means what it says.
+- **Sized on a stressed stop.** A triggered stop is a market order: it slips past the trigger and pays the taker fee. The desk sizes on what the stop will actually cost, not its trigger price, and charges the entry at the taker rate too, so your risk budget means what it says. [See what a stop costs](docs/STOP_COST.md).
 - **Ceilings you cannot trade through.** Your limits file may only tighten the desk's own caps, never loosen them.
 - **Testnet first.** Every new kind of action is rehearsed with play money before it touches mainnet.
 - **One writer.** Six Bots read; one Bot sends, once per approval, and reconciles by client order id.
@@ -196,9 +206,9 @@ SETUP.md     what your Grok Bot follows to build the desk
 agents/      seven roles: Bot profile card + full system prompt
 skills/      seventeen skills (bootstrap, hyperliquid-*, desk-*)
 template/    exact public Grok Bot profile and skill hashes
-scripts/     zero-key market/history reads, offline verification and release checks
-docs/        how it works, FAQ, provenance
-assets/      the mascot - use it as your Bots' avatar
+scripts/     zero-key market, history and stop-cost reads, offline verification, release checks
+docs/        how it works, FAQ, install pages, stop cost, provenance
+assets/      the mascot (use it as your Bots' avatar) and the README illustration
 ```
 
 | Doc | |
@@ -206,6 +216,7 @@ assets/      the mascot - use it as your Bots' avatar
 | [How the desk works](docs/ARCHITECTURE.md) | roles, files, trust boundaries |
 | [FAQ](docs/FAQ.md) | keys, approvals, testnet, customising the team |
 | [Research datasets](docs/RESEARCH_DATASETS.md) | collect, verify and hand off historical evidence |
+| [Stop cost](docs/STOP_COST.md) | what a triggered stop costs, from the live book |
 | [Skills index](skills/README.md) | every skill and who uses it |
 | [Grok Bot template](docs/GROK_BOT_TEMPLATE.md) | public profile, publish contract and clean-install evaluation |
 | [Provenance](docs/PROVENANCE.md) | sources and licences |
@@ -216,3 +227,5 @@ assets/      the mascot - use it as your Bots' avatar
 [MIT licensed](LICENSE), with the copyright and permission notice retained when reusing copies or substantial portions. Created by [Andrew Wilkinson](https://andrewwilkinson.io) and [Galleon Labs](https://github.com/galleonlabs).
 
 See [reuse and attribution](ATTRIBUTION.md) for a ready-to-copy credit line. If HyperGrok Trading Desk helps your work, [a star on the original repository](https://github.com/galleonlabs/hypergrok-trading-desk) is appreciated and entirely optional.
+
+HyperGrok has no token and will not launch one. [Read the FAQ](docs/FAQ.md#token).

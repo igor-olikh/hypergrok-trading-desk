@@ -45,5 +45,8 @@ Settings, General, Auto-review: add a Require Approval rule for financial action
 **Does it work outside Grok Bot?**
 Yes. The plugin supplies the same skills and agents. In Grok Build, run `grok plugin install galleonlabs/hypergrok-trading-desk@v1.6.1 --trust`. The format was tested with Grok Build 1.0.30 on an earlier release, not on 1.6.1; loading `rules/` there is not verified. In Claude Code, use `/plugin marketplace add galleonlabs/hypergrok-trading-desk` then `/plugin install hypergrok@hypergrok`. In Cursor, open the repository and enable the plugin. Cursor and Claude Code also load `rules/`. In Codex, use `codex plugin marketplace add galleonlabs/hypergrok-trading-desk` then `codex plugin add hypergrok@hypergrok`. In Gemini CLI, use `gemini extensions install https://github.com/galleonlabs/hypergrok-trading-desk`. Gemini support first ships in 1.6.1. Codex and Gemini CLI load the skills only, so the roles run as labelled passes.
 
+**<a id="token"></a>Does HyperGrok have a token?**
+HyperGrok has no token and will not launch one. Coins using the name were launched by third parties and are not part of this project.
+
 **Is this financial advice?**
 It is documentation and instructions. Perpetual futures can liquidate an account.

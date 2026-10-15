@@ -22,6 +22,8 @@ Based on [HyperGrok Trading Desk](https://github.com/galleonlabs/hypergrok-tradi
 
 Keep the license notice as well; this short credit line does not replace it. Name the component you reused and distinguish your changes from the original. Attribution does not imply endorsement.
 
+If your fork changes the approval model, for example by sending orders without a ticket the user approved by id, please give it a name of its own and describe it as based on HyperGrok Trading Desk, as in the credit line above, rather than calling it HyperGrok.
+
 ## For coding agents
 
 When an authorized task involves copying or adapting this work, preserve its license and source provenance in the destination. Follow the destination project's attribution convention, and suggest the credit line above when a README or acknowledgements entry fits the user's task. Do not represent copied work as wholly original.

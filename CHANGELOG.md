@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased
+
+Docs and read-only tools only. No skill, role, rule, template hash or install pin changed.
+
++ Add `scripts/stop_cost.py`, a zero-key check of what a stop really costs. It sizes one trade on the drawn stop and on the desk's stressed stop (`desk-risk-limits` section 2.2) and prints what a triggered stop would cost each way. Stop slippage is the largest of a 10 bps floor, the current spread and the live book's impact for the drawn-stop size; fees are charged at the taker rate on both legs, as the desk does. A book read that does not hold the size is reported as a floor with the budget unproven. It reproduces ticket `HG-20260816-01`, reads only public `/info`, and shares the Opening Bell's `--schema`, `--json` and error contract, adding `unpriceable_stop` for a stop the live book cannot price. HIP-3 markets need an explicit `--taker-fee`. Documented in `docs/STOP_COST.md`.
++ Share coin and DEX validation (`cli_contract.market_selection`) and the metadata read (`opening_bell.read_market`) between the Opening Bell and the stop-cost check; each script keeps its own user agent.
++ Add an install page for each tool outside Grok Bot (Claude Code, Cursor, Codex, Gemini CLI and Grok Build) with the install commands, what loads and a keyless first run.
++ Lead the README with "Grok Bot for Hyperliquid", a row of supported tools, a keyless first run and an illustration of the worked ticket. Answer "Does HyperGrok have a token?" in the FAQ: it has none and will not launch one. Ask forks that change the approval model to use a name of their own.
+
 ## 1.6.1 - 2026-10-13
 
 Tagged and published to npm. Adds Gemini CLI and Codex install paths; no skill, role or rule content changed beyond the bootstrap's release pins. The public Grok Bot template was republished for this release at https://x.ai/bot/3Fjt0kR65RoGjj5JNZJWp; its stored bootstrap body was read back against the tag. 1.6.0 shipped without a template refresh.
