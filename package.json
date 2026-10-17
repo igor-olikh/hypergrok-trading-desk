@@ -63,6 +63,7 @@
     "gemini-extension.json",
     "hooks/exchange-write-gate.json",
     "hooks/exchange_write_gate.py",
+    "hooks/ibkr_write_gate.py",
     "plugin.json",
     "rules/hypergrok-team.mdc",
     "scripts/check.sh",

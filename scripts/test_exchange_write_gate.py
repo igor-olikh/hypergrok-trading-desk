@@ -111,7 +111,8 @@ class ExchangeWriteGateTest(unittest.TestCase):
             config = json.load(handle)
         (entry,) = config["hooks"]["PreToolUse"]
         self.assertEqual(entry["matcher"], "Bash")
-        (hook,) = entry["hooks"]
+        # The Hyperliquid gate stays first; other venues may add their own gate after it.
+        hook = entry["hooks"][0]
         self.assertIn("${CLAUDE_PLUGIN_ROOT}/hooks/exchange_write_gate.py", hook["command"])
 
 

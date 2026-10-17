@@ -34,6 +34,7 @@ RESOURCES = (
     "docs/hyperliquid-codex.md", "docs/hyperliquid-cursor.md", "docs/hyperliquid-gemini-cli.md",
     "docs/hyperliquid-grok-build.md", "assets/ticket-hg-20260816-01.png",
     "hooks/exchange-write-gate.json", "hooks/exchange_write_gate.py",
+    "hooks/ibkr_write_gate.py",
 )
 SCRIPTS = (
     "check.sh", "check_grok_template.py", "check_manifests.py",

@@ -1,5 +1,5 @@
 {
-  "description": "HyperGrok: ask before any Bash command that looks like a Hyperliquid exchange write",
+  "description": "HyperGrok: ask before any Bash command that looks like a Hyperliquid or IBKR order write",
   "hooks": {
     "PreToolUse": [
       {
@@ -8,6 +8,11 @@
           {
             "type": "command",
             "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/exchange_write_gate.py\"",
+            "timeout": 10
+          },
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/ibkr_write_gate.py\"",
             "timeout": 10
           }
         ]
