@@ -9,7 +9,9 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import ssl
+import time
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -43,6 +45,33 @@ MARKET_DATA_CODE = {
 
 class IbkrError(Exception):
     pass
+
+
+ACCOUNT_ID_RE = re.compile(r"\b(?:DU|U|DF|F)\d{6,9}\b")
+SECRET_PAIR_RE = re.compile(r"(?i)(token|secret|password|cookie|session|authorization)([\"']?\s*[:=]\s*[\"']?)[^\s\"',;}]+")
+ERROR_TEXT_LIMIT = 200
+
+
+def broker_error_text(raw) -> str:
+    """The broker's own error text, shortened, with account ids and secret-looking pairs removed."""
+    if isinstance(raw, bytes):
+        raw = raw.decode("utf-8", errors="replace")
+    text = str(raw or "").strip()
+    if not text:
+        return ""
+    try:
+        payload = json.loads(text)
+    except ValueError:
+        payload = None
+    if isinstance(payload, dict):
+        for key in ("error", "message", "msg", "detail"):
+            if payload.get(key):
+                text = str(payload[key])
+                break
+    text = " ".join(text.split())
+    text = SECRET_PAIR_RE.sub(lambda m: m.group(1) + m.group(2) + "[redacted]", text)
+    text = ACCOUNT_ID_RE.sub("[account]", text)
+    return text[:ERROR_TEXT_LIMIT]
 
 
 def account_kind(account_id: str) -> str:
@@ -169,15 +198,31 @@ def parse_bars(payload, adjusted: bool) -> list[dict]:
     return bars
 
 
-def gateway_report(auth: dict, summary: dict) -> list[dict]:
-    """Doctor rows. Details name the account kind, never the account id."""
+def gateway_report(auth: dict, summary: dict, portal=None) -> list[dict]:
+    """Doctor rows. Details name the account kind, never the account id.
+
+    `portal` is None when the portal login was not checked. Otherwise it is True or False for
+    GET /sso/validate. A good portal login with a closed trading session is a WARN, not a FAIL:
+    the session is opened by POST /iserver/auth/ssodh/init on the first quote.
+    """
     rows = []
     authenticated = isinstance(auth, dict) and auth.get("authenticated") is True and auth.get("connected") is True
-    rows.append({
-        "status": "PASS" if authenticated else "FAIL",
-        "name": "ibkr auth",
-        "detail": "gateway session is authenticated" if authenticated else "gateway session is not authenticated",
-    })
+    if portal is not None:
+        rows.append({
+            "status": "PASS" if portal else "FAIL",
+            "name": "ibkr portal login",
+            "detail": "portal login is valid" if portal else "portal login is not valid; log in again in the browser",
+        })
+    if authenticated:
+        rows.append({"status": "PASS", "name": "ibkr auth", "detail": "gateway session is authenticated"})
+    elif portal:
+        rows.append({
+            "status": "WARN",
+            "name": "ibkr auth",
+            "detail": "portal login is fine but the trading session is not open yet; a quote read opens it",
+        })
+    else:
+        rows.append({"status": "FAIL", "name": "ibkr auth", "detail": "gateway session is not authenticated"})
     kind = (summary or {}).get("account_kind") or "unknown"
     if kind == "paper":
         rows.append({"status": "PASS", "name": "ibkr account", "detail": "paper account"})
@@ -211,6 +256,9 @@ class MockIbkrClient:
 
     def auth_status(self):
         return dict(self.auth)
+
+    def portal_status(self):
+        return bool(self.auth.get("portal", True))
 
     def resolve_contract(self, symbol: str):
         return {"symbol": symbol.upper(), "conid": int(self.quote.get("conid") or 1),
@@ -250,7 +298,11 @@ class MockIbkrClient:
 
 
 class ClientPortalClient:
-    def __init__(self, base_url: str, account_id: str = "", timeout: float = 15, opener=None):
+    def __init__(self, base_url: str, account_id: str = "", timeout: float = 15, opener=None,
+                 sleep=time.sleep, snapshot_attempts: int = 4, retry_delay: float = 0.5):
+        self.sleep = sleep
+        self.snapshot_attempts = max(1, int(snapshot_attempts))
+        self.retry_delay = retry_delay
         self.base_url = base_url.rstrip("/")
         if not self.base_url.endswith("/v1/api"):
             self.base_url += "/v1/api"
@@ -278,7 +330,14 @@ class ClientPortalClient:
             with self.opener.open(request, timeout=self.timeout) as response:
                 raw = response.read()
         except urllib.error.HTTPError as exc:
-            raise IbkrError(f"gateway returned HTTP {exc.code}") from exc
+            try:
+                detail = broker_error_text(exc.read())
+            except Exception:
+                detail = ""
+            message = f"gateway returned HTTP {exc.code}"
+            if detail:
+                message += f": {detail}"
+            raise IbkrError(message) from exc
         except OSError as exc:
             raise IbkrError("gateway unreachable") from exc
         if not raw:
@@ -289,10 +348,24 @@ class ClientPortalClient:
             raise IbkrError("gateway returned non-JSON") from exc
 
     def auth_status(self):
-        payload = self._request("GET", "/iserver/auth/status")
+        """Trading session state: POST /iserver/auth/status."""
+        payload = self._request("POST", "/iserver/auth/status")
         if not isinstance(payload, dict):
             raise IbkrError("auth status is not an object")
         return payload
+
+    def portal_status(self) -> bool:
+        """Portal login only (GET /sso/validate). It says nothing about the trading session."""
+        payload = self._request("GET", "/sso/validate")
+        if not isinstance(payload, dict):
+            return False
+        result = payload.get("RESULT", payload.get("result"))
+        return result is True or str(result).lower() == "true"
+
+    def open_trading_session(self):
+        """Open the brokerage session, then list accounts. The broker wants both before market data."""
+        self._request("POST", "/iserver/auth/ssodh/init", {"publish": True, "compete": True})
+        self._request("GET", "/iserver/accounts")
 
     def _ensure_account(self):
         if self.account_id:
@@ -316,13 +389,27 @@ class ClientPortalClient:
         return parse_search(payload, symbol)
 
     def get_quote(self, symbol: str):
+        self.open_trading_session()
         contract = self.resolve_contract(symbol)
         query = {"conids": contract["conid"], "fields": SNAPSHOT_FIELDS}
-        parsed = parse_snapshot(self._request("GET", "/iserver/marketdata/snapshot", query=query))
-        if parsed is None:
-            parsed = parse_snapshot(self._request("GET", "/iserver/marketdata/snapshot", query=query))
+        parsed = None
+        last_error = ""
+        for attempt in range(self.snapshot_attempts):
+            if attempt:
+                self.sleep(self.retry_delay)
+            try:
+                payload = self._request("GET", "/iserver/marketdata/snapshot", query=query)
+                parsed = None if payload in (None, [], "") else parse_snapshot(payload)
+            except IbkrError as exc:
+                last_error = str(exc)
+                parsed = None
+                continue
+            last_error = ""
+            if parsed and parsed.get("last") not in (None, ""):
+                break
         if not parsed or parsed.get("last") in (None, ""):
-            raise IbkrError(f"{symbol} quote is unavailable")
+            reason = last_error or "the broker returned no last price"
+            raise IbkrError(f"{symbol} quote is unavailable: {reason}")
         parsed.update(contract)
         parsed["depth"] = "unavailable"
         parsed["network"] = self.account_kind

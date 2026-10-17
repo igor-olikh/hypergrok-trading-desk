@@ -13,6 +13,7 @@ import re
 import sys
 from decimal import Decimal
 
+from ibkr_client import IbkrError
 from ibkr_risk import review_new_risk, round_limit
 from ibkr_venue import OFF, enabled
 
@@ -113,7 +114,10 @@ def send_once(client, ticket: dict, approval: str, *, directory: str, risk_state
         cap = Decimal(str(ticket.get("max_slippage_bps", "10")))
         if moved > cap:
             raise SendRefused("price moved past the ticket slippage")
-    if risk_state is not None:
+    # Fail closed: no risk state, no send. The risk check is not optional.
+    if not isinstance(risk_state, dict) or not risk_state:
+        raise SendRefused("risk state is required; refusing to send without a risk check")
+    try:
         decision = review_new_risk(risk_state, {
             "side": ticket["side"],
             "halted": ticket.get("halted"),
@@ -121,14 +125,17 @@ def send_once(client, ticket: dict, approval: str, *, directory: str, risk_state
             "outside_rth": ticket.get("outside_rth"),
             "order_type": ticket["order_type"],
             "notional": str(Decimal(str(ticket["qty"])) * Decimal(str(ticket["limit"]))),
-            "risk": ticket.get("risk_usd", "0"),
+            "risk": str(max(Decimal(str(ticket.get("risk_usd") or "0")),
+                            (Decimal(str(ticket["limit"])) - Decimal(str(ticket["stop"]))) * Decimal(str(ticket["qty"])))),
             "stop": ticket["stop"],
             "sector": ticket.get("sector") or "",
             "is_day_trade": ticket.get("is_day_trade", False),
             "short_ok": False,
         })
-        if decision["decision"] != "PASS":
-            raise SendRefused("; ".join(decision["reasons"]))
+    except (ValueError, TypeError, ArithmeticError) as exc:
+        raise SendRefused(f"risk check could not run: {exc}") from exc
+    if decision["decision"] != "PASS":
+        raise SendRefused("; ".join(decision["reasons"]))
     journal = _load_journal(directory)
     prior = journal.get(ticket["id"])
     if prior:
@@ -173,6 +180,32 @@ def _public_result(result) -> dict:
     return allowed or {"accepted": True}
 
 
+def risk_state_from_client(client, overrides: dict | None = None) -> dict:
+    """Build the risk state from broker reads. Anything the broker cannot give is refused, not guessed.
+
+    `overrides` is an optional file kept outside the repo (open risk, start-of-day equity,
+    settled cash, account type). It cannot lower the equity the broker reported.
+    """
+    summary = client.get_account_summary()
+    equity = summary.get("net_liquidation")
+    if equity is None or Decimal(str(equity)) <= 0:
+        raise SendRefused("broker equity is unavailable; refusing to send")
+    state = {
+        "equity": str(equity),
+        "leverage": str(summary.get("leverage") if summary.get("leverage") is not None else "0"),
+        "buying_power": None if summary.get("buying_power") is None else str(summary["buying_power"]),
+        "settled_cash": str(summary.get("available_funds") if summary.get("available_funds") is not None else "0"),
+        "day_trades_remaining": summary.get("day_trades_remaining"),
+        "positions": client.get_positions(),
+        "open_risk": "0",
+        "account_type": "cash",
+    }
+    for key in ("open_risk", "start_of_day_equity", "settled_cash", "account_type", "margin_enabled"):
+        if overrides and key in overrides:
+            state[key] = overrides[key]
+    return state
+
+
 def main(argv=None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--ticket-file", required=True)
@@ -180,6 +213,8 @@ def main(argv=None) -> int:
     parser.add_argument("--live", action="store_true")
     parser.add_argument("--confirm", default="")
     parser.add_argument("--state-dir", default=None)
+    parser.add_argument("--risk-overrides-file", default=None,
+                        help="optional JSON kept outside the repo: open_risk, start_of_day_equity, settled_cash, account_type")
     args = parser.parse_args(argv)
     if not enabled():
         print(f"Not sent: {OFF}", file=sys.stderr)
@@ -188,13 +223,25 @@ def main(argv=None) -> int:
         with open(args.ticket_file, encoding="utf-8") as handle:
             ticket = json.load(handle)
         from ibkr_client import client_from_env
+        overrides = None
+        if args.risk_overrides_file:
+            with open(args.risk_overrides_file, encoding="utf-8") as handle:
+                overrides = json.load(handle)
+            if not isinstance(overrides, dict):
+                raise SendRefused("risk overrides file must be a JSON object")
         client = client_from_env()
+        try:
+            risk_state = risk_state_from_client(client, overrides)
+        except SendRefused:
+            raise
+        except Exception as exc:
+            raise SendRefused(f"risk state could not be read: {exc}") from exc
         outcome = send_once(
-            client, ticket, args.approve,
+            client, ticket, args.approve, risk_state=risk_state,
             directory=args.state_dir or state_dir(),
             live_flag=args.live, confirmation=args.confirm,
         )
-    except (OSError, ValueError, SendRefused, json.JSONDecodeError) as exc:
+    except (OSError, ValueError, SendRefused, IbkrError, json.JSONDecodeError) as exc:
         print(f"Not sent: {exc}", file=sys.stderr)
         return 2
     print(json.dumps(outcome, sort_keys=True))

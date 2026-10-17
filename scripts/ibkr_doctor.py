@@ -16,13 +16,29 @@ def ibkr_gateway_checks(timeout: float):
     from desk_doctor import Check
     from ibkr_client import IbkrError, client_from_env, gateway_report
 
+    client = client_from_env(timeout)
+    portal = None
+    auth = None
+    summary = None
+    reachable = False
     try:
-        client = client_from_env(timeout)
-        auth = client.auth_status()
-        summary = client.get_account_summary()
+        portal = client.portal_status()
+        reachable = True
     except (IbkrError, OSError, ValueError, TypeError):
+        portal = False
+    try:
+        auth = client.auth_status()
+        reachable = True
+    except (IbkrError, OSError, ValueError, TypeError):
+        auth = None
+    try:
+        summary = client.get_account_summary()
+        reachable = True
+    except (IbkrError, OSError, ValueError, TypeError):
+        summary = None
+    if not reachable:
         return [Check("FAIL", "ibkr gateway", "unavailable")]
-    return [Check(row["status"], row["name"], row["detail"]) for row in gateway_report(auth, summary)]
+    return [Check(row["status"], row["name"], row["detail"]) for row in gateway_report(auth, summary, portal)]
 
 
 def main(argv=None) -> int:
