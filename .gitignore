@@ -4,3 +4,18 @@ __pycache__/
 *.py[cod]
 .venv/
 *.log
+
+# Secrets and runtime state: never commit (public repo)
+.env
+.env.*
+!.env.example
+logs/
+data/
+reports/
+*.log
+trading-desk/
+*.sqlite
+screenshots/
+screenshot/
+Screenshots/
+*.sqlite3
